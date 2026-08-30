@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Brototype AI Notes",
+  "version": "1.2.0",
+  "description": "Turns your Brototype task list into beginner-friendly study notes in your own Notion, with reviewer questions for every task.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp2BiOi0zu6+NvD/ZkVei5fQVhU+YJlQOKF92QsK22dYb3+gyxYm5EbASSle81QS5zP7pswLyLraPLyva0867Mwq/SylqG3tXOq+HKh7VAMllnNYliH2bl/+zp7dGCiyn0OY43/NCLUJCnhGXiTk3+MP3JdAbEaGsQlbtf/f2/AMWB6h39C8nC6b3u6Rf4EXu690bPcVUtI7aTbdV7HqV2fOG7xWL7eaXbVl34ABdep5pgTVZuaR+oCfQjZdDagsqXeBrmshS55yLAK3OQ0v8avn/6HcaMRfgKIIi/XtOibhJmB3IYEyW+3AbQe6YNEHbEUd3fU415EiZGQmdVH+I3QIDAQAB",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://brototype.com/*",
+    "https://*.brototype.com/*",
+    "https://api.notion.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "app.html"
+  },
+  "action": {
+    "default_title": "Brototype AI Notes \u2014 open the side panel",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "app.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

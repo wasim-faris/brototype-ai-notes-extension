@@ -1,0 +1,18 @@
+{
+  "name": "brototype-ai-notes-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared backend for the Brototype AI Notes extension: Notion OAuth token exchange and AI generation. Holds every secret; holds no user data.",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --env-file-if-exists=.env --watch src/index.js",
+    "test": "cd ../extension && npm test"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
