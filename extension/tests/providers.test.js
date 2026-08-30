@@ -130,12 +130,11 @@ test('backend mode with no URL uses the server this build was made for, so nobod
   assert.equal(getProvider(makeConfig({ mode: 'backend', backendUrl: 'https://scratch.example' })).resolved.backendUrl, 'https://scratch.example')
 })
 
-test('a fresh install needs no AI setup at all: shared backend, nothing to paste', () => {
-  assert.equal(DEFAULT_CONFIG.ai.mode, 'backend')
-  assert.equal(DEFAULT_CONFIG.ai.backendUrl, '', 'the build decides the server')
-  const provider = getProvider(DEFAULT_CONFIG)
-  assert.equal(provider.mode, 'backend')
-  assert.ok(!/localhost|http/.test(provider.describe()), 'the description names no server')
+test('a fresh install is direct mode with OpenRouter selected and no key, so the user\'s own key is the only one that can ever be used', () => {
+  assert.equal(DEFAULT_CONFIG.ai.mode, 'direct')
+  assert.equal(DEFAULT_CONFIG.ai.activeProvider, 'openrouter')
+  assert.equal(DEFAULT_CONFIG.ai.providers.openrouter.apiKey, '')
+  assert.throws(() => getProvider(DEFAULT_CONFIG), (e) => e.code === 'AI_NOT_CONFIGURED')
 })
 
 test('an unknown provider id is rejected, not silently defaulted', () => {

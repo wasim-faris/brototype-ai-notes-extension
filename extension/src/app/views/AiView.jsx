@@ -7,15 +7,15 @@ import { IS_DEV_BUILD } from '../../lib/env.js'
 import { Panel, Callout, Field, Secret, Spinner } from '../../ui/components.jsx'
 
 /**
- * The AI, as a student sees it.
+ * The AI provider, as three things a student actually has to decide: which
+ * service, their own API key for it, and (rarely) which model.
  *
- * Normally there is nothing to decide: notes are written by the shared
- * service, which holds the only key. The screen says so and offers a test.
+ * Every user brings their own key. It is stored only in this Chrome profile
+ * and sent only to the provider it belongs to; every provider keeps its own
+ * saved settings, so switching never loses a key or sends the wrong one.
  *
- * Under Advanced a student (or a developer) can use their own API key
- * instead: then the three real decisions appear — which service, its key,
- * and (rarely) which model. Every provider keeps its own saved settings, so
- * switching never loses a key.
+ * "Shared AI service" (an operator-run proxy) is a development-build option
+ * under Advanced; a published build never offers it.
  */
 export default function AiView({ config, ai, update, updateProvider, go }) {
   const { mode, activeProvider, backendUrl, providers } = config.ai
@@ -93,7 +93,7 @@ export default function AiView({ config, ai, update, updateProvider, go }) {
             <strong className="grow">{test.state === 'testing' ? 'Checking…' : test.state === 'err' ? 'Not reachable' : 'Connected'}</strong>
           </div>
           <p className="small muted">
-            Your study notes are written by the shared AI service. There is nothing to set up and no key to paste.
+            Development mode: notes are written by the backend's own provider key, not yours.
           </p>
           <div className="row wrap">
             <button onClick={testConnection} disabled={test.state === 'testing'}>
@@ -109,7 +109,7 @@ export default function AiView({ config, ai, update, updateProvider, go }) {
           <strong className="grow">{test.state === 'testing' ? 'Checking…' : connected ? 'Connected' : 'Not connected'}</strong>
         </div>
         <p className="small muted">
-          {connected ? ai.description : 'Connect an AI provider to generate study notes.'}
+          {connected ? ai.description : 'Choose a provider and paste your own API key to generate study notes.'}
         </p>
 
         <hr className="divider" />
@@ -174,16 +174,18 @@ export default function AiView({ config, ai, update, updateProvider, go }) {
               </Field>
             )}
 
-            <Field label="How the provider is reached">
-              <label className={`choice ${shared ? 'selected' : ''}`}>
-                <input type="radio" name="aimode" checked={shared} onChange={() => update({ ai: { mode: 'backend' } })} />
-                <span className="small"><strong>Shared AI service</strong> — recommended. No key needed.</span>
-              </label>
-              <label className={`choice ${!shared ? 'selected' : ''}`}>
-                <input type="radio" name="aimode" checked={!shared} onChange={() => update({ ai: { mode: 'direct' } })} />
-                <span className="small"><strong>My own API key</strong> — this extension calls the provider you choose, with a key stored only in this Chrome profile.</span>
-              </label>
-            </Field>
+            {(IS_DEV_BUILD || shared) && (
+              <Field label="How the provider is reached">
+                <label className={`choice ${!shared ? 'selected' : ''}`}>
+                  <input type="radio" name="aimode" checked={!shared} onChange={() => update({ ai: { mode: 'direct' } })} />
+                  <span className="small"><strong>My own API key</strong> — this extension calls the provider you choose, with a key stored only in this Chrome profile.</span>
+                </label>
+                <label className={`choice ${shared ? 'selected' : ''}`}>
+                  <input type="radio" name="aimode" checked={shared} onChange={() => update({ ai: { mode: 'backend' } })} />
+                  <span className="small"><strong>Shared AI service</strong> — development only: a proxy run by whoever hosts the backend.</span>
+                </label>
+              </Field>
+            )}
 
             {shared && IS_DEV_BUILD && (
               <Field label="Server address" hint="Development builds only. Leave empty for the server this build was made for.">

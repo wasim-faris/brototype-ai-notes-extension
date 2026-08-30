@@ -39,18 +39,16 @@ export const DEFAULT_CONFIG = {
 
   // AI - two independent axes: how it is reached, and which provider it is.
   //
-  // The published extension reaches it through the shared backend, which
-  // holds the only AI key; a user installs, connects Notion, and generates.
-  // 'direct' (your own key, stored in this profile) stays available under
-  // AI -> Advanced for developers and anyone who prefers their own account.
+  // Every user brings their own key: 'direct' means this extension calls the
+  // chosen provider itself, with a key that lives only in this Chrome profile
+  // and is sent only to that provider. The backend is not involved in AI at
+  // all. ('backend' - an operator-run proxy - is a development option only.)
   ai: {
-    mode: 'backend',             // 'backend' | 'direct'
-    // Only meaningful in direct mode, and then just the initial dropdown
-    // selection. OpenRouter matches what the shared backend runs.
+    mode: 'direct',              // 'direct' | 'backend'
+    // Just the initial dropdown selection: OpenRouter has free models and one
+    // key reaches many providers, so it is the softest landing.
     activeProvider: 'openrouter',
-    // Empty means "the backend this build was made for" (lib/env.js), the same
-    // rule as notionOAuthBackendUrl: a release build talks to the deployed
-    // server without anybody typing a URL.
+    // Development only. Empty means "the backend this build was made for".
     backendUrl: '',
     providers: blankProviders(),
   },

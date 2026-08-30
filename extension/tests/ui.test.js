@@ -272,20 +272,26 @@ test('the shell tracks connection and destination as separate facts', async () =
   assert.ok(App)
 })
 
-test('a fresh install\'s AI screen is "Connected" with nothing to paste, and the own-key path is under Advanced', async () => {
+test('a fresh install\'s AI screen asks for the user\'s own key: provider dropdown, key box, test - not under Advanced', async () => {
   const { default: AiView } = await load('src/app/views/AiView.jsx')
   const { DEFAULT_CONFIG } = await import('../src/lib/storage.js')
-  const html = renderToString(React.createElement(AiView, { config: DEFAULT_CONFIG, ai: { ok: true, description: 'Shared AI service · via backend' }, update: noop, updateProvider: noop, go() {} }))
+  const html = renderToString(React.createElement(AiView, { config: DEFAULT_CONFIG, ai: { ok: false, message: 'No API key is saved for OpenRouter.' }, update: noop, updateProvider: noop, go() {} }))
 
-  assert.ok(html.includes('<strong class="grow">Connected</strong>'))
-  assert.ok(/shared AI service/i.test(html), 'says who writes the notes')
-  assert.ok(html.includes('Test connection'))
-  assert.ok(!html.includes('<span class="label">API key</span>'), 'no key field for a normal user')
-  assert.ok(!html.includes('<span class="label">Provider</span>'), 'no provider choice either')
-  assert.ok(!/localhost|http:\/\//.test(html.slice(0, html.indexOf('<summary>Advanced</summary>'))), 'no server address in the primary UI')
+  assert.ok(html.includes('<strong class="grow">Not connected</strong>'))
+  assert.ok(/your own API key/i.test(html), 'says the key is the user\'s own')
 
   const advancedAt = html.indexOf('<summary>Advanced</summary>')
-  assert.ok(advancedAt > 0)
-  assert.ok(html.indexOf('My own API key') > advancedAt, 'the own-key option lives under Advanced')
-  assert.ok(html.includes('Go to Generate'), 'and the next step is offered')
+  const primary = html.slice(0, advancedAt)
+  const order = ['Provider', 'API key', 'Model'].map((t) => primary.indexOf(`<span class="label">${t}</span>`))
+  assert.ok(order.every((i) => i >= 0), `provider, key and model must be in the primary flow, got ${order}`)
+  assert.deepEqual(order, [...order].sort((a, b) => a - b))
+  assert.ok(primary.includes('<option value="openrouter" selected="">OpenRouter</option>'), 'OpenRouter is the default selection')
+  for (const label of ['Google Gemini', 'OpenAI', 'Anthropic Claude', 'xAI Grok', 'Custom / OpenAI-compatible']) {
+    assert.ok(primary.includes(`>${label}</option>`), `${label} is no longer offered`)
+  }
+  assert.ok(primary.includes('Test connection'))
+  assert.ok(primary.includes('openrouter.ai'), 'links to where a key comes from')
+  assert.ok(!/shared AI service|Render|localhost/i.test(primary), 'no server talk in the primary flow')
+  // The dev-only proxy toggle stays under Advanced (this is an unbuilt module, i.e. a dev build).
+  assert.ok(html.indexOf('Shared AI service') > advancedAt)
 })

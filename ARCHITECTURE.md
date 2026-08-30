@@ -8,12 +8,13 @@ Open Brototype → extension detects this week's tasks → AI writes complete be
 > a fixture captured from the real Brototype task page (`fixtures/brototype-task-page.html`). See
 > §10 for what the real page taught us, and §6 for the provider-independent AI layer.
 >
-> **Public-release update (Aug 2026).** §1–§2 below describe the original "extension-only for
-> personal use" reasoning. For the *published* extension the decision went the other way:
-> one shared backend on Render holds the only AI key and the Notion client secret; every user's
-> Notion token stays in their own browser; the backend keeps no user state at all. The AI is
-> reached "via backend" by default and "direct" (own key) only under *Advanced*. The reasoning,
-> the threat model and the deployment steps are in [README.md](README.md) §1 and §14.
+> **Public-release update (Aug 2026).** The published extension follows §1–§2 almost exactly:
+> every user brings their **own AI key** (OpenRouter by default, any registry provider), stored
+> in their own `chrome.storage.local` and sent directly to that provider — the "direct" mode
+> described in §6. The one shared backend on Render does only what §2 says genuinely needs a
+> server: the Notion OAuth token exchange. It holds the Notion client secret, no AI key, and no
+> user state. (`/generate` remains as a development-only proxy, off unless an operator sets a key.)
+> Threat model and deployment steps: [README.md](README.md) §1, §7, §14.
 
 ---
 

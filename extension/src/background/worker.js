@@ -71,12 +71,19 @@ async function preflight() {
 }
 
 /** Failures that will repeat for every task, so the run stops at the first. */
-const RUN_STOPPING = ['AI_BAD_KEY', 'AI_FORBIDDEN', 'AI_NOT_CONFIGURED', 'AI_SERVICE_ERROR', 'BACKEND_NO_KEY', 'NOTION_UNAUTHORIZED', 'NOTION_FORBIDDEN', 'NOTION_NOT_SHARED']
+const RUN_STOPPING = ['AI_BAD_KEY', 'AI_FORBIDDEN', 'AI_QUOTA', 'AI_BAD_MODEL', 'AI_NOT_CONFIGURED', 'AI_SERVICE_ERROR', 'BACKEND_NO_KEY', 'NOTION_UNAUTHORIZED', 'NOTION_FORBIDDEN', 'NOTION_NOT_SHARED']
 
-/** One sentence per failed task, in the user's terms. */
-function taskFailureMessage(error) {
+/**
+ * One sentence per failed task, in the user's terms. In direct mode the key
+ * and the account are the user's own, so the provider's verdict ("OpenRouter
+ * rejected your API key") is exactly what they need to hear.
+ */
+function taskFailureMessage(error, mode) {
   if (error.code.startsWith('NOTION_')) return error.message
-  if (['AI_BAD_KEY', 'AI_FORBIDDEN', 'AI_NOT_CONFIGURED', 'AI_SERVICE_ERROR', 'BACKEND_NO_KEY', 'BACKEND_UNREACHABLE', 'AI_QUOTA'].includes(error.code)) {
+  if (['AI_BAD_KEY', 'AI_FORBIDDEN', 'AI_QUOTA', 'AI_NOT_CONFIGURED', 'AI_BAD_MODEL'].includes(error.code)) {
+    return mode === 'direct' ? error.message : 'The AI service is temporarily unavailable. Please try again.'
+  }
+  if (['AI_SERVICE_ERROR', 'BACKEND_NO_KEY', 'BACKEND_UNREACHABLE'].includes(error.code)) {
     return 'The AI service is temporarily unavailable. Please try again.'
   }
   return "Couldn't generate notes for this task. You can retry it."
@@ -199,7 +206,7 @@ async function runJob({ tasks, unit, pageTitle: title, strategy, resumeJobId }) 
         await updateJob((j) => {
           // The task line says what the user can do; the exact reason (which
           // subtopic, what the provider said) is kept in Details.
-          setTask(j, task.number, { status: 'failed', message: taskFailureMessage(appError) })
+          setTask(j, task.number, { status: 'failed', message: taskFailureMessage(appError, provider.mode) })
           appendLog(j, `Task ${task.number} failed: ${appError.message}`, 'error')
           if (appError.detail) appendLog(j, `Task ${task.number}: ${appError.detail}`, 'debug')
         })

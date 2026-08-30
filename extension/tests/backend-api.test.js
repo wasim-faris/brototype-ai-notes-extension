@@ -134,6 +134,34 @@ test('a request cannot redirect the key: baseUrl and model in the body are ignor
   assert.equal(upstream[0].headers.Authorization, `Bearer ${SECRET_KEY}`)
 })
 
+test('a key sent in the request body, headers or query is never used - the server spends only its own', { skip }, async () => {
+  const USER_KEY = 'sk-or-v1-USER-KEY-SHOULD-NEVER-BE-USED-0000'
+  const res = await realFetch(`${BASE}/generate?apiKey=${USER_KEY}&api_key=${USER_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: EXT_ORIGIN, Authorization: `Bearer ${USER_KEY}`, 'x-api-key': USER_KEY },
+    body: JSON.stringify({ providerId: 'openrouter', apiKey: USER_KEY, api_key: USER_KEY, key: USER_KEY, headers: { Authorization: USER_KEY }, providers: { openrouter: { apiKey: USER_KEY } }, user: 'u', schema: PROBE_SCHEMA }),
+  })
+  assert.equal(res.status, 200, await res.text())
+  assert.equal(upstream.length, 1)
+  assert.equal(upstream[0].headers.Authorization, `Bearer ${SECRET_KEY}`, 'the server key, not the one in the request')
+  assert.ok(!JSON.stringify(upstream[0]).includes(USER_KEY), 'the request key went nowhere')
+})
+
+test('with no server key at all the proxy is simply off: 503, nothing spent, no key accepted', { skip }, async () => {
+  const saved = process.env.OPENROUTER_API_KEY
+  delete process.env.OPENROUTER_API_KEY
+  try {
+    const health = await realFetch(`${BASE}/health`).then((r) => r.json())
+    assert.equal(health.ok, true, 'health is fine without any AI key - Notion OAuth still works')
+    assert.equal(health.aiConfigured, false)
+    const res = await post('/generate', { apiKey: 'sk-or-v1-user-key-0000000000000000000', user: 'u', schema: PROBE_SCHEMA })
+    assert.equal(res.status, 503)
+    assert.equal(upstream.length, 0)
+  } finally {
+    process.env.OPENROUTER_API_KEY = saved
+  }
+})
+
 test('a provider this deployment has no key for is not usable, whatever the request says', { skip }, async () => {
   const res = await post('/generate', { providerId: 'openai', user: 'u', schema: PROBE_SCHEMA })
   assert.equal(res.status, 503)

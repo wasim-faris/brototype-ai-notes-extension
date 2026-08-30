@@ -6,17 +6,20 @@ AI, and builds an organised page in **your own Notion** — with 5 reviewer ques
 ```
 Brototype task page
       ↓  extension reads the numbered task list (only when you open the panel on that page)
-Chrome extension
-      ↓  sends task titles + subtopic titles
-Shared backend (Render)  ──→  AI provider (OpenRouter)      ← the only place an AI key exists
+Chrome extension ──→  YOUR AI provider (OpenRouter by default; Gemini, OpenAI, Claude, Grok, custom)
+      ↓               with YOUR API key, stored only in your Chrome profile, sent only to that provider
       ↓  structured notes come back
 Chrome extension
       ↓  writes pages with YOUR Notion token (stored only in your Chrome profile)
 Your Notion workspace
+
+Shared backend (Render): Notion OAuth code → token exchange ONLY. Holds the Notion client secret,
+no AI key, no user data.
 ```
 
-One published extension, one shared backend, and every user's **own** Notion account and notes.
-The backend keeps no user data: no accounts, no sessions, no tokens, no database.
+One published extension, one tiny shared backend, and every user's **own** Notion account, **own**
+AI key and **own** notes. The backend keeps no user data: no accounts, no sessions, no tokens, no
+database — and it never sees an AI key.
 
 - **[PRIVACY.md](PRIVACY.md)** — exactly what data goes where. Host it and link it from the Web Store listing.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — why it is built this way and what the AI is and is not allowed to decide.
@@ -28,17 +31,23 @@ The backend keeps no user data: no accounts, no sessions, no tokens, no database
 
 | Part | Where it runs | What it holds |
 |---|---|---|
-| `extension/` | Each user's Chrome | That user's Notion OAuth token, chosen destination page, settings, the current run. All in `chrome.storage.local` (per profile, unreadable by websites). |
-| `backend/` | One Render web service | `OPENROUTER_API_KEY`, `NOTION_OAUTH_CLIENT_SECRET`. **Nothing per user.** |
+| `extension/` | Each user's Chrome | That user's **AI provider key(s)**, Notion OAuth token, chosen destination page, settings, the current run. All in `chrome.storage.local` (per profile, unreadable by websites). |
+| `backend/` | One Render web service | `NOTION_OAUTH_CLIENT_SECRET` only. **No AI key, nothing per user.** |
 | Notion | notion.so | The generated pages, in the user's workspace, created by the user's own connection. |
 
-The backend has three real endpoints:
+**AI request flow (direct mode, the only mode a published build offers):**
+`service worker → https://<provider>/…` with `Authorization: Bearer <user's key>` (Gemini:
+`x-goog-api-key`, Claude: `x-api-key`) — the same adapter code for every provider
+(`extension/src/ai/*`). The backend is not on the path. Keys are never put in URLs, never logged
+(the job log records counts and titles), and never bundled.
+
+The backend has these endpoints:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | `{ ok: true, aiConfigured, notionOAuth, providers }` — Render's health check and the extension's *Test connection*. |
-| `GET /notion/oauth/config` + `POST /notion/oauth/exchange` | Notion is a *confidential-client* OAuth flow (HTTP Basic `client_id:client_secret`, no PKCE), so the code→token swap must happen where the secret is. The token goes straight back to that user's extension and is not kept. |
-| `POST /generate` | Prompt + one of the extension's known output schemas in, structured notes out. The server chooses provider, model and endpoint from its environment; a request cannot change them. |
+| `GET /health` | `{ ok: true, aiConfigured, notionOAuth, providers }` — Render's health check. `aiConfigured` is `false` in production, and that is correct. |
+| `GET /notion/oauth/config` + `POST /notion/oauth/exchange` (+ `/refresh`) | Notion is a *confidential-client* OAuth flow (HTTP Basic `client_id:client_secret`, no PKCE), so the code→token swap must happen where the secret is. The token goes straight back to that user's extension and is not kept. |
+| `POST /generate` | **Optional, development only.** A proxy that spends a key set in the server's own environment (`AI → Advanced → Shared AI service` in a dev build). It never accepts a key from a request (tested), only generates the extension's own schemas, and answers 503 when no server key is set — which is the production state. |
 
 **User isolation** is structural rather than enforced: there is no shared state on the server that
 could be reached with the wrong ID. User A's token lives in User A's browser and is sent only to
@@ -56,8 +65,8 @@ See [ARCHITECTURE.md §6–§8](ARCHITECTURE.md).
 
 - Node.js **22** or newer (`node -v`)
 - A Notion account, to create the **public** integration
-- An [OpenRouter](https://openrouter.ai) key (or any other supported provider — see §5)
-- A [Render](https://render.com) account for the backend
+- A [Render](https://render.com) account for the (Notion-OAuth-only) backend
+- Each *user* needs their own AI key — OpenRouter has free models (§7)
 - A Chrome Web Store developer account, to publish
 
 ## 3. Local setup
@@ -76,8 +85,8 @@ npm run build                                          # development build -> ex
 Load `extension/dist` in Chrome: `chrome://extensions` → *Developer mode* → *Load unpacked*.
 `npm run dev` rebuilds on every change; click ↻ on the extension card afterwards.
 
-A development build talks to `http://localhost:8787` for both Notion sign-in and AI. Nothing in
-source has to be edited to switch to production — see §10.
+A development build talks to `http://localhost:8787` for Notion sign-in. Nothing in source has to
+be edited to switch to production — see §10.
 
 ## 4. Backend
 
@@ -85,16 +94,15 @@ source has to be edited to switch to production — see §10.
 backend/
   src/index.js         Express app: CORS, rate limit, /health, OAuth exchange, /generate
   src/notion-oauth.js  code -> token with the client secret (server-side only)
-  src/providers.js     which AI provider/model/key, from the environment
-  src/schemas.js       the only output schemas /generate will produce
+  src/providers.js     (dev proxy only) which provider/model/key, from the environment
+  src/schemas.js       (dev proxy only) the only output schemas /generate will produce
 ```
 
-It imports the extension's own provider adapters (`extension/src/ai/*`), so there is exactly one
-implementation of each provider. Run it with `npm start`; it prints what it can do:
+Run it with `npm start`; it prints what it can do:
 
 ```
 Brototype AI Notes backend listening on 0.0.0.0:8787 (http://localhost:8787)
-AI providers with keys: openrouter — default: openrouter
+AI proxy off (normal for production: users bring their own provider keys)
 Notion OAuth ready — redirect URI https://<id>.chromiumapp.org/notion
 ⚠️  ALLOWED_EXTENSION_IDS is not set — any extension may call this server (fine for development)
 ```
@@ -107,17 +115,14 @@ error as JSON, and drains in-flight requests on `SIGTERM`.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `OPENROUTER_API_KEY` | yes (one provider key) | The shared AI key. Never leaves the server. |
-| `OPENROUTER_MODEL` | no | Model to spend it on. Default: the extension registry default (a `:free` model — fine for testing, **not** for many simultaneous users, see §15). |
-| `DEFAULT_PROVIDER` | no | Which provider serves requests (`openrouter`). Default: the first with a key. |
-| `GEMINI_API_KEY`, `OPENAI_API_KEY`, `CLAUDE_API_KEY`, `GROK_API_KEY`, `CUSTOM_API_KEY` (+ `*_MODEL`, `*_BASE_URL`) | no | Alternative providers, same pattern. |
 | `NOTION_OAUTH_CLIENT_ID` | yes | From your public Notion integration. |
 | `NOTION_OAUTH_CLIENT_SECRET` | yes | Same. **Server only.** |
 | `NOTION_OAUTH_REDIRECT_URI` | yes | `https://<extension-id>.chromiumapp.org/notion` (§6). |
 | `ALLOWED_EXTENSION_IDS` | production | Comma-separated extension id(s) allowed to call from a browser. Empty = any extension (development). |
 | `NODE_ENV` | production | `production` hides developer `detail` fields from API error responses. |
 | `PORT` | local only | Render sets its own. |
-| `RATE_LIMIT_PER_MINUTE`, `AI_TIMEOUT_MS` | no | Tuning (defaults 30, 180000). |
+| `RATE_LIMIT_PER_MINUTE` | no | Requests per client IP per minute (default 30). |
+| `OPENROUTER_API_KEY` etc., `DEFAULT_PROVIDER`, `*_MODEL`, `AI_TIMEOUT_MS` | **no — leave unset in production** | Only for the development-only `/generate` proxy. Setting one makes the server spend *your* key for dev builds that opt in; the published extension never calls it. |
 
 Local: put them in `backend/.env` (gitignored). Render: dashboard → Environment, or accept the
 prompts `render.yaml` generates. Never commit `.env`; the repo's `.gitignore` covers `.env`,
@@ -141,16 +146,23 @@ prompts `render.yaml` generates. Never commit `.env`; the repo's `.gitignore` co
 `extension/key.pem` is the private key. It is gitignored. Losing it does not break published users
 (the store keeps the id), but back it up with your other secrets anyway.
 
-## 7. OpenRouter setup
+## 7. AI setup (each user, in the extension)
 
-1. <https://openrouter.ai/settings/keys> → create a key → `OPENROUTER_API_KEY` on the backend.
-2. Optional: `OPENROUTER_MODEL=<model id from openrouter.ai/models>`. The registry default is a
-   free, rate-limited model; for a class of students set a paid model and a spending limit on the
-   key.
-3. The extension never sees this key. Students do not configure anything for AI.
+**AI tab → Provider → API key → Save → Test connection.** Nothing on the server.
 
-Anyone who prefers their own account can still use it: **AI → Advanced → My own API key** stores a
-key in that person's Chrome profile and calls the provider directly (the pre-existing "direct" mode).
+| Provider | Key from | Notes |
+|---|---|---|
+| **OpenRouter** (default) | <https://openrouter.ai/settings/keys> | One key, hundreds of models; `:free` models cost nothing but are rate-limited (~20 req/min shared). |
+| Google Gemini | <https://aistudio.google.com/app/apikey> | Free tier, no card. |
+| OpenAI | <https://platform.openai.com/api-keys> | Paid API account (ChatGPT subscriptions do not include it). |
+| Anthropic Claude | <https://console.anthropic.com/settings/keys> | Paid API account. |
+| xAI Grok | <https://console.x.ai> | Prepaid credits required. |
+| Custom / OpenAI-compatible | you | DeepSeek, Groq, Together, LM Studio, local Ollama (`/v1`). |
+
+The key is stored in that user's `chrome.storage.local`, shown masked after saving (Replace /
+Delete), and sent only to the provider it belongs to. Each provider keeps its own saved key, so
+switching never loses or mixes keys (`tests/user-owned-keys.test.js`). You, the publisher, pay for
+nothing and see no keys.
 
 ## 8. Running locally, end to end
 
@@ -161,9 +173,10 @@ cd extension && npm run dev                   # terminal 2
 
 Load `extension/dist`, open a Brototype task page, click the 📚 icon:
 
-1. **Notion → Continue with Notion** → approve → *Connected*.
-2. **Create new page** (top level of your workspace) or **Choose existing page**.
-3. **Generate** → tasks are detected from the page → *Generate study notes*.
+1. **AI → OpenRouter → paste your key → Save → Test connection**.
+2. **Notion → Continue with Notion** → approve → *Connected*.
+3. **Create new page** (top level of your workspace) or **Choose existing page**.
+4. **Generate** → tasks are detected from the page → *Generate study notes*.
 
 The run happens in the service worker; closing the panel never loses it.
 
@@ -173,12 +186,13 @@ The run happens in the service worker; closing the panel never loses it.
 cd extension && npm test          # also runnable as `npm test` in backend/
 ```
 
-386 tests, no browser and no network needed. Beyond the parsing, structure and provider tests
+396 tests, no browser and no network needed. Beyond the parsing, structure and provider tests
 (`ARCHITECTURE.md §10`), the production-relevant ones are:
 
 | File | What it proves |
 |---|---|
-| `backend-api.test.js` | Real Express server on a port: PORT/0.0.0.0, `/health`, CORS allowlist (own extension yes, other extension/website 403, never `*`), body `baseUrl`/`model` ignored, unknown schemas refused, operator errors translated, retryable classification, **two users' sign-ins independent and nothing kept**, no secret in any response. |
+| `user-owned-keys.test.js` | Fresh install = direct/OpenRouter/no key; all six providers accept their own key; a request carries only the **selected** provider's key, to that provider's host, in a header (never URL/body), never to the backend; switching providers switches keys without losing any; a rejected key names the right provider; no key in source. |
+| `backend-api.test.js` | Real Express server on a port: PORT/0.0.0.0, `/health`, CORS allowlist (own extension yes, other extension/website 403, never `*`), a key in body/headers/query is **never used**, proxy is off (503) with no server key, unknown schemas refused, **two users' sign-ins independent and nothing kept**, no secret in any response. |
 | `oauth-e2e.test.js` | The extension's OAuth module against the real backend over HTTP: connect → create destination page → ready. |
 | `notion-oauth.test.js` | State parameter, cancellation, replay, refresh, error wording. |
 | `release-build.test.js` | Builds a real release into a temp dir: refuses non-https backend, bundle contains only the deployed URL (no localhost, no `.env`, no source maps, no key patterns), manifest has minimum permissions. |
@@ -209,10 +223,10 @@ Zip the contents of `extension/dist` (not the folder) for the Web Store.
 1. Push the repo to GitHub (check `git status` shows no `.env`, `key.pem`).
 2. Render → **New → Blueprint** → select the repo. Render creates the service from `render.yaml`
    and asks for each `sync: false` value:
-   `OPENROUTER_API_KEY`, `NOTION_OAUTH_CLIENT_ID`, `NOTION_OAUTH_CLIENT_SECRET`,
-   `NOTION_OAUTH_REDIRECT_URI`, `ALLOWED_EXTENSION_IDS`.
+   `NOTION_OAUTH_CLIENT_ID`, `NOTION_OAUTH_CLIENT_SECRET`, `NOTION_OAUTH_REDIRECT_URI`,
+   `ALLOWED_EXTENSION_IDS`. **Do not set any `*_API_KEY`.**
 3. Deploy. Check `https://<service>.onrender.com/health` returns
-   `{"ok":true,"aiConfigured":true,"notionOAuth":true,...}`.
+   `{"ok":true,"aiConfigured":false,"notionOAuth":true,...}` (`aiConfigured:false` is expected).
 4. Build the extension against that URL (§10).
 
 Details: build `cd backend && npm ci --omit=dev`, start `cd backend && npm start`, health check
@@ -230,11 +244,13 @@ reports as *AI service is temporarily unavailable — try again*. A paid instanc
 4. **Privacy tab** — required because the extension uses `identity` and sends data to a remote
    service. Answer from [PRIVACY.md](PRIVACY.md); host it and paste the URL. Declare:
    *website content* (the task list, only on brototype.com) and *authentication information*
-   (Notion OAuth token, stored locally). Not sold, not used for unrelated purposes.
+   (Notion OAuth token and the user's own AI provider key, both stored locally). Not sold, not
+   used for unrelated purposes.
 5. Permission justifications (the reviewer asks): `storage` settings + token; `identity` Notion
    sign-in window; `scripting` + `activeTab` + `brototype.com` read the task list on demand;
-   `sidePanel` the UI; `api.notion.com` write notes; `generativelanguage.googleapis.com` the
-   optional own-key Gemini path; your Render origin the backend.
+   `sidePanel` the UI; `api.notion.com` write notes; `generativelanguage.googleapis.com` Gemini
+   with the user's own key (the other providers allow browser CORS and need no host entry); your
+   Render origin the Notion sign-in backend.
 6. Remote code: none. All JS is in the package; the extension only calls APIs. CSP is
    `script-src 'self'; object-src 'self'`.
 
@@ -253,17 +269,22 @@ Users never edit anything: the published build already knows the backend.
 
 ## 14. Security notes
 
-- **Secrets exist only on the backend.** The extension package contains no AI key and no Notion
-  client secret; `release-build.test.js` and `build.test.js` fail the suite if one appears.
+- **The only server-side secret is the Notion client secret.** There is no AI key anywhere in the
+  system except each user's own, in their own browser. The extension package contains no key of
+  any kind; `release-build.test.js`, `build.test.js` and `user-owned-keys.test.js` fail the suite
+  if one appears.
+- **A user's AI key** is in `chrome.storage.local` — readable only by this extension in that
+  Chrome profile (and by anyone with full access to that machine, as with any stored credential).
+  It is sent only to the provider it belongs to, never to the backend (tested at both ends), never
+  in a URL, never logged, never in an error message.
 - **Notion tokens** are per user, in that user's `chrome.storage.local`, sent only to
   `api.notion.com`. Never logged (the job log records counts and titles only). *Disconnect*
   forgets them; revoke from Notion → Settings → Connections.
-- **The backend is a public URL with a key behind it.** Mitigations: only the extension's own
-  schemas are generated, provider/model/endpoint are fixed server-side, per-IP rate limit, CORS
-  restricted to the extension id. What it cannot prevent: someone extracting the URL and calling
-  `/generate` with a spoofed Origin from a script. Set a **spending limit** on the OpenRouter key
-  and watch Render's logs (`POST /generate 200 12034ms` lines) for abuse. A per-user login would
-  be the next step if that ever matters.
+- **The backend is a public URL with only the Notion client secret behind it**, which it uses
+  solely to swap one-time codes for tokens. There is no AI key to abuse. If you ever set one for
+  the dev proxy on a public deployment, the mitigations are: known schemas only, provider/model/
+  endpoint fixed server-side, no key accepted from requests, per-IP rate limit, CORS allowlist —
+  but a spoofed-Origin script could still spend it, so don't.
 - **CORS** never uses `*` with credentials — there are no credentials. Origins are echoed only
   for `chrome-extension://` and, in production, only for the allow-listed id.
 - **The `key` in `manifest.json` is the public key.** Safe to ship; it is what pins the id.
@@ -280,10 +301,12 @@ Users never edit anything: the published build already knows the backend.
 | *Notion sign-in is not set up correctly for this installation* | Redirect URI mismatch. Compare **Notion → Advanced → Redirect URL** with the integration's list and `NOTION_OAUTH_REDIRECT_URI`. |
 | *Your Notion connection has expired. Reconnect Notion to continue.* | Token revoked/expired. Notion tab → Continue with Notion. |
 | *Notion doesn't have permission to read and add content here* | Integration capabilities (§6) or the page wasn't ticked during sign-in. Reconnect and tick it. |
-| *The AI service is temporarily unavailable* | Backend unreachable, no key, key rejected, out of credit, or provider down. Backend log has `[generate] AI_BAD_KEY: …` etc. Users just retry. |
+| *OpenRouter rejected your API key* / *Gemini rejected…* | That user's own key is wrong or revoked. AI tab → Replace. |
+| *… says your account is out of quota or credit* | The user's provider account needs billing/credits, or a free model is exhausted. Switch model or provider on the AI tab. |
+| *The AI service is temporarily unavailable* | Provider outage or (dev builds only) the backend proxy is off. Retry. |
 | *Couldn't generate notes for this task. You can retry it.* | The model could not produce every subtopic after retries; nothing was written for that task. **Retry failed** redoes only failed tasks. |
 | *Too many requests* | Per-IP limit (30/min). A whole classroom behind one NAT shares an IP — raise `RATE_LIMIT_PER_MINUTE`. |
-| Free `:free` OpenRouter model 429s constantly | Free models share ~20 req/min *across all users*. Set `OPENROUTER_MODEL` to a paid model. |
+| Free `:free` OpenRouter model 429s constantly | Free models are rate-limited per key. The extension paces and retries; pick a paid model on the AI tab if it persists. |
 | *Open a Brototype task page to get started* | The panel only sees `*.brototype.com` tabs. Switch to the task tab; or use **Paste tasks**. |
 | Extension id changed after loading unpacked | `manifest.json` lost its `key` field. Restore it; the Notion redirect depends on it. |
 | `CORS` errors in the service-worker console | `ALLOWED_EXTENSION_IDS` on the server does not include this build's id (unpacked builds keep the same id thanks to `key`; check `chrome://extensions`). |

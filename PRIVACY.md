@@ -19,14 +19,16 @@ handles, where it goes, and what is kept.
 
 | Data | Sent to | Why | Kept? |
 |---|---|---|---|
-| Task titles and subtopic titles | The extension's backend server, which forwards them to the AI provider (OpenRouter) | To generate the study notes | Not by the backend. The AI provider's own retention policy applies to prompts ([OpenRouter privacy](https://openrouter.ai/privacy)). |
+| Task titles and subtopic titles | **Directly from your browser to the AI provider you chose** (OpenRouter by default; or Google Gemini, OpenAI, Anthropic, xAI, or a server you name) | To generate the study notes | Not by this extension or its backend. The provider's own retention policy applies to prompts (e.g. [OpenRouter privacy](https://openrouter.ai/privacy)). |
+| Your AI provider API key | Stored **only** in your Chrome profile (`chrome.storage.local`); sent only to that provider, as a request header | So the notes are generated on your own account | Until you replace or delete it on the AI tab, reset settings, or uninstall. **Never** sent to the extension's backend. |
 | Generated notes | Your Notion workspace, via Notion's API | To create your study pages | In your Notion, under your control |
 | A one-time Notion sign-in code | The backend server, which exchanges it with Notion for an access token | To connect your Notion account without exposing a secret | No — exchanged and returned immediately |
 | Your Notion access token | Stored **only** in your Chrome profile (`chrome.storage.local`); sent only to `api.notion.com` | To write to your Notion | Until you press *Disconnect*, uninstall, or revoke access in Notion → Settings → Connections |
 | Your chosen destination page and settings | Stored only in your Chrome profile | Convenience | Until you change or reset them |
 
-The backend keeps **no accounts, no sessions, no database and no user data**. Its logs record the
-request method, path, status code and duration — never request contents, tokens or Notion data.
+The extension's backend exists only to complete the Notion sign-in. It keeps **no accounts, no
+sessions, no database and no user data**, and it holds no AI key. Its logs record the request
+method, path, status code and duration — never request contents, tokens or Notion data.
 
 ## What the extension does not do
 

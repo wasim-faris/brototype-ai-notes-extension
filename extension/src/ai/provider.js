@@ -60,9 +60,9 @@ export function resolveProviderConfig(config, providerId = null) {
 /** Why this provider is not ready to run, or null when it is. */
 export function validateProviderConfig(resolved) {
   const { meta, label } = resolved
-  if (!resolved.model) return `No model is set for ${label}. Choose one on the Options page.`
-  if (!resolved.baseUrl) return `No API base URL is set for ${label}. Add it on the Options page.`
-  if (!resolved.apiKey && !meta.keyOptional) return `No API key is saved for ${label}. Add it on the Options page.`
+  if (!resolved.model) return `No model is set for ${label}. Choose one on the AI tab.`
+  if (!resolved.baseUrl) return `No API base URL is set for ${label}. Add it on the AI tab.`
+  if (!resolved.apiKey && !meta.keyOptional) return `No API key is saved for ${label}. Add yours on the AI tab.`
   return null
 }
 

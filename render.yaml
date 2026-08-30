@@ -23,19 +23,15 @@ services:
       - key: NODE_VERSION
         value: "22"
       # --- secrets: entered in the Render dashboard, never committed --------
-      - key: OPENROUTER_API_KEY
-        sync: false
+      # No AI key: every user brings their own, and it never reaches this server.
       - key: NOTION_OAUTH_CLIENT_ID
         sync: false
       - key: NOTION_OAUTH_CLIENT_SECRET
         sync: false
       # --- public configuration ----------------------------------------------
-      - key: DEFAULT_PROVIDER
-        value: openrouter
       # https://<extension-id>.chromiumapp.org/notion  (Notion -> Advanced in the extension)
       - key: NOTION_OAUTH_REDIRECT_URI
         sync: false
       # The published extension's id, so no other extension can use this server.
       - key: ALLOWED_EXTENSION_IDS
         sync: false
-      # Optional: - key: OPENROUTER_MODEL   value: nvidia/nemotron-3-super-120b-a12b:free

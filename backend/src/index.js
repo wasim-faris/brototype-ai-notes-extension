@@ -144,7 +144,12 @@ app.post('/notion/oauth/refresh', async (req, res) => {
   }
 })
 
-// --- AI ---------------------------------------------------------------------
+// --- AI (optional, development) ----------------------------------------------
+// The public extension does NOT use this: every user's key is their own and
+// goes straight from their browser to their provider. This endpoint exists for
+// an operator who sets a *_API_KEY here and switches a development build to
+// "Shared AI service". It never reads a key from a request - the only key it
+// can spend is its own - and with none configured it answers 503.
 
 const UPSTREAM_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 180_000
 const MAX_PROMPT_CHARS = 60_000
@@ -229,8 +234,8 @@ export const server = app.listen(PORT, HOST, () => {
   const ready = configuredProviders()
   console.log(`Brototype AI Notes backend listening on ${HOST}:${PORT}${isProduction ? '' : ` (http://localhost:${PORT})`}`)
   console.log(ready.length
-    ? `AI providers with keys: ${ready.join(', ')} — default: ${defaultProviderId()}`
-    : '⚠️  No AI provider key found — set OPENROUTER_API_KEY (or another *_API_KEY)')
+    ? `Optional AI proxy enabled — providers with keys: ${ready.join(', ')} — default: ${defaultProviderId()}`
+    : 'AI proxy off (normal for production: users bring their own provider keys)')
   console.log(oauthConfigured()
     ? `Notion OAuth ready — redirect URI ${redirectUri()}`
     : `⚠️  Notion OAuth is OFF — missing ${['NOTION_OAUTH_CLIENT_ID', 'NOTION_OAUTH_CLIENT_SECRET', 'NOTION_OAUTH_REDIRECT_URI'].filter((k) => !process.env[k]).join(', ')}`)

@@ -50,7 +50,7 @@ export function errorMessage(json, text) {
 /** The failures that mean the same thing everywhere. */
 export function mapCommonError(status, detail, label) {
   if (status === 401) {
-    return new AppError('AI_BAD_KEY', `${label} rejected your API key. Open Options and replace it.`, { detail })
+    return new AppError('AI_BAD_KEY', `${label} rejected your API key. Open the AI tab and replace it.`, { detail })
   }
   if (status === 403) {
     // Providers explain 403s well ("your team has no credits yet"), so lead
@@ -62,13 +62,13 @@ export function mapCommonError(status, detail, label) {
       { detail })
   }
   if (status === 404) {
-    return new AppError('AI_BAD_MODEL', `${label} does not recognise that model or base URL. Check both on the Options page.`, { detail })
+    return new AppError('AI_BAD_MODEL', `${label} does not recognise that model or base URL. Check both on the AI tab.`, { detail })
   }
   if (status === 429) {
     return new AppError('AI_RATE_LIMIT', `${label} rate limit hit. Waiting and retrying automatically.`, { retryable: true, detail })
   }
   if (status === 402 || /quota|insufficient|billing|credit/i.test(detail || '')) {
-    return new AppError('AI_QUOTA', `${label} says the account is out of quota or credit. Check your billing, or switch provider in Options.`, { detail })
+    return new AppError('AI_QUOTA', `${label} says your account is out of quota or credit. Check your billing, or switch provider on the AI tab.`, { detail })
   }
   if (status >= 500) {
     return new AppError('AI_SERVER', `${label} had a temporary server error. Retrying automatically.`, { retryable: true, detail })
