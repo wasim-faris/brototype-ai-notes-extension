@@ -167,7 +167,11 @@ textarea { min-height: 130px; resize: vertical; font: var(--mono); }
 .callout.warn { background: var(--warn-soft);   color: var(--warn); }
 .callout.err  { background: var(--err-soft);    color: var(--err); }
 .callout .actions { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.callout .actions button { background: var(--surface); border-color: transparent; box-shadow: var(--shadow); }
+/* Secondary buttons sit on the tinted callout as white chips. Scoped to
+   non-primary buttons on purpose: this selector (0,2,1) outranks
+   `button.primary` (0,1,1), and an unscoped version once painted primary
+   buttons white-on-white until hovered. */
+.callout .actions button:not(.primary):not(.danger) { background: var(--surface); border-color: transparent; box-shadow: var(--shadow); }
 
 /* ---- lists ---------------------------------------------------------------- */
 .list { display: flex; flex-direction: column; }

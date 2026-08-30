@@ -50,7 +50,7 @@ export function errorMessage(json, text) {
 /** The failures that mean the same thing everywhere. */
 export function mapCommonError(status, detail, label) {
   if (status === 401) {
-    return new AppError('AI_BAD_KEY', `${label} rejected your API key. Open the AI tab and replace it.`, { detail })
+    return new AppError('AI_BAD_KEY', `${label} rejected your API key. Open AI settings and check your key.`, { detail })
   }
   if (status === 403) {
     // Providers explain 403s well ("your team has no credits yet"), so lead
