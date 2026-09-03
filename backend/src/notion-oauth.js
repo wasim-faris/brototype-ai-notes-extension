@@ -17,6 +17,7 @@
 
 const TOKEN_URL = 'https://api.notion.com/v1/oauth/token'
 const NOTION_VERSION = '2022-06-28'
+const TOKEN_TIMEOUT_MS = 15_000
 
 export const clientId = () => process.env.NOTION_OAUTH_CLIENT_ID || ''
 const clientSecret = () => process.env.NOTION_OAUTH_CLIENT_SECRET || ''
@@ -74,9 +75,12 @@ async function tokenRequest(body) {
         'Notion-Version': NOTION_VERSION,
       },
       body: JSON.stringify(body),
+      // Bounded, so a stalled Notion API cannot hold a request open for minutes.
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     })
   } catch (error) {
-    throw fail(503, 'NOTION_OAUTH_UNREACHABLE', 'Notion could not be reached. Please try again.', 'This server could not reach api.notion.com.')
+    throw fail(503, 'NOTION_OAUTH_UNREACHABLE', 'Notion could not be reached. Please try again.',
+      `This server could not reach api.notion.com (${error?.name || 'network error'}).`)
   }
 
   const json = await response.json().catch(() => ({}))
