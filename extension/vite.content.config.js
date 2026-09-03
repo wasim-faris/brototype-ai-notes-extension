@@ -5,6 +5,9 @@ import { defineConfig } from 'vite'
 import { resolve } from 'node:path'
 
 export default defineConfig({
+  // Same flag as the app build: development-only diagnostics are compiled out
+  // of a release content script.
+  define: { __DEV_BUILD__: JSON.stringify(process.env.__BUILD_IS_DEV !== 'false') },
   build: {
     outDir: process.env.__BUILD_OUT_DIR || 'dist',
     emptyOutDir: false, // build #1 already emptied it; don't wipe its output

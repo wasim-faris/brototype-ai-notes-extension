@@ -15,6 +15,7 @@ import { getConfig, setConfig, setProviderConfig, resolveNotionToken, notionAuth
 import { AppError, errors } from '../lib/errors.js'
 import { createPacer, generateTaskNotes } from '../ai/generator.js'
 import { getProvider } from '../ai/provider.js'
+import { retryTransient, DIRECT_RETRY_DELAYS, BACKEND_RETRY_DELAYS } from '../ai/retry.js'
 import { resolveStudyStyle, DEFAULT_STUDY_STYLE_SETTINGS } from '../ai/studyStyle.js'
 import { notion, pageTitle } from '../notion/client.js'
 import { authorize, redirectUri, withNotionAuth } from '../notion/oauth.js'
@@ -401,7 +402,12 @@ const handlers = {
       ? { ...stored, ai: { ...stored.ai, ...overrides, providers: { ...stored.ai.providers, ...(overrides.providers || {}) } } }
       : stored
     const provider = getProvider(config)
-    const result = await provider.testConnection()
+    // Same policy as note generation: a transient failure (a cold OpenRouter
+    // model answering 5xx, a Render service still waking up) is retried
+    // before anything is shown. Permanent errors surface at once.
+    const result = await retryTransient(() => provider.testConnection(), {
+      delays: provider.mode === 'backend' ? BACKEND_RETRY_DELAYS : DIRECT_RETRY_DELAYS,
+    })
     return {
       ok: true,
       provider: provider.resolved.label,
